@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Typing Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98D8E8 100%);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 50%, #E0F6FF 100%);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        #healthBar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 200px;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            overflow: hidden;
+            pointer-events: auto;
+        }
+
+        #healthFill {
+            height: 100%;
+            background: linear-gradient(to right, #ff4444, #ff6b6b);
+            transition: width 0.3s ease;
+            border-radius: 15px;
+        }
+
+        #healthText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        #score {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            pointer-events: auto;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        #inputContainer {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: auto;
+            opacity: 0;
+            height: 1px;
+            overflow: hidden;
+        }
+
+        #typingDisplay {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 20px;
+            min-width: 200px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            z-index: 30;
+        }
+
+        .bullet {
+            position: absolute;
+            width: 4px;
+            height: 12px;
+            background: linear-gradient(to top, #FFD700, #FFA500);
+            border-radius: 2px;
+            box-shadow: 0 0 10px #FFA500;
+            z-index: 15;
+        }
+
+        .targetingLine {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(to right, transparent, rgba(255, 165, 0, 0.6), transparent);
+            transform-origin: left center;
+            z-index: 14;
+            pointer-events: none;
+        }
+
+        @keyframes bulletFire {
+            0% {
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(0.5) translateY(-20px);
+                opacity: 0;
+            }
+        }
+
+        .cloud.targeted {
+            filter: drop-shadow(0 0 10px #FFA500);
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+
+        #menuButton {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s ease;
+        }
+
+        #menuButton:hover {
+            background: white;
+            transform: scale(1.05);
+        }
+
+        .modal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            pointer-events: auto;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+            color: #333;
+            text-align: center;
+        }
+
+        .modal button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .modal button:hover {
+            background: #45a049;
+            transform: scale(1.05);
+        }
+
+        #settingsModal label {
+            display: block;
+            margin: 15px 0;
+            font-size: 16px;
+            color: #333;
+        }
+
+        #settingsModal select, #settingsModal textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        #settingsModal textarea {
+            height: 100px;
+            resize: vertical;
+        }
+
+        .cloud {
+            position: absolute;
+            transition: opacity 0.5s ease;
+        }
+
+        .cloud.fading {
+            opacity: 0;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: rgba(0, 0, 0, 0.6);
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .character {
+            transition: transform 0.3s ease;
+        }
+
+        .character.hit {
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        #overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 90;
+        }
+
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 95;
+        }
+
+        #playButton {
+            padding: 20px 50px;
+            font-size: 24px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        #playButton:hover {
+            background: #45a049;
+            transform: scale(1.1);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        #developerInfo {
+            position: fixed;
+            left: 30px;
+            top: 40%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 10px;
+            font-size: 20px;
+            color: #333;
+            width: 300px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            z-index: 50;
+        }
+
+        #developerInfo h3 {
+            margin: 0 0 5px 0;
+            color: #4CAF50;
+        }
+
+        #developerInfo p {
+            margin: 5px 0;
+            font-style: italic;
+        }
+
+        #developerInfo a {
+            color: #4CAF50;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        #developerInfo a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="developerInfo">
+        <h3>Developer: Abhijit</h3>
+        <p><em>"Keep playing, keep improving!"</em></p>
+        <p>Contact: <a href="https://wa.me/919856544157" target="_blank"><strong>WhatsApp</strong></a></p>
+    </div>
+    
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div id="healthBar" style="display: none;">
+                <div id="healthFill" style="width: 100%"></div>
+                <span id="healthText">100 Health</span>
+            </div>
+            <div id="score" style="display: none;">
+                <div id="wpmDisplay">0 WPM</div>
+                <div id="timerDisplay" style="font-size: 14px; color: #666;">Time: 0s</div>
+            </div>
+            <button id="menuButton" style="display: none;">Settings</button>
+            <div id="inputContainer" style="display: none;">
+                <input type="text" id="wordInput" autocomplete="off" tabindex="0">
+            </div>
+            <div id="typingDisplay" style="display: none;"></div>
+            <div id="instructions"></div>
+        </div>
+        
+        <div id="overlay"></div>
+        
+        <div id="startScreen">
+            <button id="playButton">Play Game</button>
+        </div>
+        
+        <div id="settingsModal" class="modal">
+            <h2>Settings</h2>
+            <label>
+                Difficulty:
+                <select id="difficulty">
+                    <option value="easy">Easy</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </label>
+            <label>
+                Sound Effects:
+                <input type="checkbox" id="soundToggle" checked>
+            </label>
+            <label>
+                Word List:
+                <select id="wordListType">
+                    <option value="default">Default (1000 common words)</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </label>
+            <label id="customWordsLabel" style="display: none;">
+                Custom Words (comma, space, or newline separated, min 10):
+                <textarea id="customWords" placeholder="apple, banana, orange..."></textarea>
+            </label>
+            <button onclick="saveSettings()">Save & Play</button>
+            <button onclick="closeSettings()">Cancel</button>
+        </div>
+        
+        <div id="gameOverModal" class="modal">
+            <h2>Game Over!</h2>
+            <p id="finalScore" style="font-size: 24px; margin: 20px 0;"></p>
+            <p id="highScore" style="font-size: 20px; margin: 20px 0;"></p>
+            <button onclick="restartGame()">Play Again</button>
+            <button onclick="showSettings()">Settings</button>
+        </div>
+        
+    </div>
+
+    <script>
+        // Common English words (top 1000)
+        const defaultWords = [
+            'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'I',
+            'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
+            'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she',
+            'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their', 'what',
+            'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me',
+            'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him', 'know', 'take',
+            'people', 'into', 'year', 'your', 'good', 'some', 'could', 'them', 'see', 'other',
+            'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also',
+            'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way',
+            'even', 'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us',
+            'part', 'find', 'made', 'live', 'where', 'much', 'too', 'very', 'still', 'being',
+            'high', 'between', 'never', 'old', 'each', 'school', 'late', 'need', 'mean', 'keep',
+            'boy', 'follow', 'around', 'stop', 'face', 'watch', 'far', 'hand', 'important', 'child',
+            'small', 'since', 'against', 'turn', 'home', 'large', 'place', 'such', 'again', 'why',
+            'ask', 'went', 'men', 'here', 'off', 'try', 'let', 'world', 'near', 'build',
+            'self', 'earth', 'father', 'head', 'stand', 'own', 'page', 'should', 'country', 'found',
+            'answer', 'grow', 'study', 'learn', 'plant', 'cover', 'food', 'sun', 'four', 'thought',
+            'city', 'tree', 'cross', 'farm', 'hard', 'start', 'might', 'story', 'saw', 'far',
+            'sea', 'draw', 'left', 'press', 'close', 'night', 'real', 'life', 'few', 'north'
+        ];
+
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let gameRunning = false;
+        let gameStarted = false;
+        let health = 100;
+        let score = 0;
+        let wordsTyped = 0;
+        let startTime = Date.now();
+        let clouds = [];
+        let bullets = [];
+        let targetingLines = [];
+        let characterX = 0;
+        let characterDirection = 1;
+        let characterSpeed = 2;
+        let cloudSpawnTimer = 0;
+        let cloudSpawnInterval = 120; // frames between spawns
+        let currentWords = [...defaultWords];
+        let soundEnabled = true;
+        let highScore = localStorage.getItem('cloudGameHighScore') || 0;
+        let currentTyping = '';
+        let targetCloud = null;
+        let firingInterval = null;
+        let lastTargetCloud = null;
+
+        // Audio setup
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(frequency, duration) {
+            if (!soundEnabled) return;
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.value = frequency;
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function playSuccessSound() {
+            playSound(523.25, 0.1); // C5
+            setTimeout(() => playSound(659.25, 0.1), 100); // E5
+        }
+
+        function playDamageSound() {
+            playSound(200, 0.2);
+        }
+
+        // Canvas setup
+        function resizeCanvas() {
+            canvas.width = gameContainer.offsetWidth;
+            canvas.height = gameContainer.offsetHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Bullet class
+        class Bullet {
+            constructor(x, y, targetX, targetY) {
+                this.x = x;
+                this.y = y;
+                this.startX = x;
+                this.startY = y;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.speed = 8;
+                this.active = true;
+                
+                // Calculate direction
+                const dx = targetX - x;
+                const dy = targetY - y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                this.vx = (dx / distance) * this.speed;
+                this.vy = (dy / distance) * this.speed;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // Check if bullet reached target or went off screen
+                if (this.y < -10 || this.y > canvas.height + 10 || 
+                    this.x < -10 || this.x > canvas.width + 10) {
+                    this.active = false;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.fillStyle = '#FFD700';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#FFA500';
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, 3, 6, Math.atan2(this.vy, this.vx) + Math.PI/2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Cloud class
+        class Cloud {
+            constructor(word) {
+                this.word = word;
+                this.x = Math.random() * (canvas.width - 150) + 75;
+                this.y = -50;
+                this.width = 120;
+                this.height = 60;
+                this.speed = 1 + (difficulty === 'easy' ? 0 : difficulty === 'hard' ? 1 : 0.5);
+                this.opacity = 1;
+                this.fading = false;
+                this.targeted = false;
+            }
+
+            update() {
+                if (!this.fading) {
+                    this.y += this.speed;
+                } else {
+                    this.opacity -= 0.05;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                
+                // Apply targeting effect
+                if (this.targeted) {
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#FFA500';
+                }
+                
+                // Cloud shape
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(this.x - 25, this.y, 25, 0, Math.PI * 2);
+                ctx.arc(this.x + 25, this.y, 25, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y - 10, 30, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y + 10, 20, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Cloud shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.beginPath();
+                ctx.arc(this.x - 25, this.y + 5, 25, 0, Math.PI * 2);
+                ctx.arc(this.x + 25, this.y + 5, 25, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y - 5, 30, 0, Math.PI * 2);
+                ctx.arc(this.x, this.y + 15, 20, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Word
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.word, this.x, this.y);
+                
+                ctx.restore();
+            }
+
+            checkCollision(charX, charY) {
+                const charWidth = 70;
+                const charHeight = 80;
+                return this.x - this.width/2 < charX + charWidth/2 &&
+                       this.x + this.width/2 > charX - charWidth/2 &&
+                       this.y + this.height/2 > charY - charHeight/2 &&
+                       this.y - this.height/2 < charY + charHeight/2;
+            }
+        }
+
+        // Character object (Top-down Aircraft)
+        const character = {
+            width: 70,
+            height: 80,
+            y: canvas.height - 100,
+            draw: function() {
+                ctx.save();
+                
+                // Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.beginPath();
+                ctx.ellipse(characterX, this.y + 5, 25, 15, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Main fuselage (body)
+                ctx.fillStyle = '#E0E0E0';
+                ctx.beginPath();
+                ctx.ellipse(characterX, this.y, 8, 30, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Fuselage gradient overlay
+                const bodyGradient = ctx.createLinearGradient(characterX - 8, 0, characterX + 8, 0);
+                bodyGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+                bodyGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
+                bodyGradient.addColorStop(1, 'rgba(200, 200, 200, 0.3)');
+                ctx.fillStyle = bodyGradient;
+                ctx.beginPath();
+                ctx.ellipse(characterX, this.y, 8, 30, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Wings
+                ctx.fillStyle = '#C0C0C0';
+                // Left wing
+                ctx.beginPath();
+                ctx.moveTo(characterX - 8, this.y - 5);
+                ctx.lineTo(characterX - 35, this.y - 8);
+                ctx.lineTo(characterX - 35, this.y + 8);
+                ctx.lineTo(characterX - 8, this.y + 5);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Right wing
+                ctx.beginPath();
+                ctx.moveTo(characterX + 8, this.y - 5);
+                ctx.lineTo(characterX + 35, this.y - 8);
+                ctx.lineTo(characterX + 35, this.y + 8);
+                ctx.lineTo(characterX + 8, this.y + 5);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Wing edges (darker)
+                ctx.strokeStyle = '#888888';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Engines (under wings)
+                ctx.fillStyle = '#666666';
+                // Left engine
+                ctx.beginPath();
+                ctx.ellipse(characterX - 20, this.y + 5, 4, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Right engine
+                ctx.beginPath();
+                ctx.ellipse(characterX + 20, this.y + 5, 4, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Engine intakes
+                ctx.fillStyle = '#333333';
+                ctx.beginPath();
+                ctx.ellipse(characterX - 20, this.y + 3, 2, 3, 0, 0, Math.PI * 2);
+                ctx.ellipse(characterX + 20, this.y + 3, 2, 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Tail section
+                ctx.fillStyle = '#C0C0C0';
+                // Horizontal stabilizers
+                ctx.beginPath();
+                ctx.moveTo(characterX - 5, this.y - 20);
+                ctx.lineTo(characterX - 15, this.y - 25);
+                ctx.lineTo(characterX - 15, this.y - 20);
+                ctx.lineTo(characterX - 5, this.y - 15);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.moveTo(characterX + 5, this.y - 20);
+                ctx.lineTo(characterX + 15, this.y - 25);
+                ctx.lineTo(characterX + 15, this.y - 20);
+                ctx.lineTo(characterX + 5, this.y - 15);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Vertical stabilizer
+                ctx.fillStyle = '#FF6B6B';
+                ctx.beginPath();
+                ctx.moveTo(characterX, this.y - 25);
+                ctx.lineTo(characterX - 3, this.y - 20);
+                ctx.lineTo(characterX, this.y - 15);
+                ctx.lineTo(characterX + 3, this.y - 20);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Cockpit window
+                ctx.fillStyle = '#4A90E2';
+                ctx.beginPath();
+                ctx.ellipse(characterX, this.y + 20, 4, 6, 0, 0, Math.PI);
+                ctx.fill();
+                
+                // Nose cone
+                ctx.fillStyle = '#FF6B6B';
+                ctx.beginPath();
+                ctx.arc(characterX, this.y + 28, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Wing details (flaps)
+                ctx.strokeStyle = '#999999';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(characterX - 30, this.y);
+                ctx.lineTo(characterX - 10, this.y);
+                ctx.moveTo(characterX + 30, this.y);
+                ctx.lineTo(characterX + 10, this.y);
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+        };
+
+        // Game settings
+        let difficulty = 'medium';
+        
+        // Update functions
+        function updateHealth(newHealth) {
+            health = Math.max(0, Math.min(100, newHealth));
+            document.getElementById('healthFill').style.width = health + '%';
+            document.getElementById('healthText').textContent = Math.floor(health) + ' Health';
+            
+            if (health <= 0) {
+                gameOver();
+            }
+        }
+
+        function updateScore() {
+            const currentTime = Date.now();
+            const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+            const minutes = (currentTime - startTime) / 60000;
+            const wpm = minutes > 0 ? Math.round(wordsTyped / minutes) : 0;
+            score = wpm;
+            
+            document.getElementById('wpmDisplay').textContent = wpm + ' WPM';
+            document.getElementById('timerDisplay').textContent = 'Time: ' + elapsedSeconds + 's';
+        }
+
+        function spawnCloud() {
+            const word = currentWords[Math.floor(Math.random() * currentWords.length)];
+            clouds.push(new Cloud(word));
+        }
+
+        // Input handling
+        document.addEventListener('keydown', function(e) {
+            if (!gameRunning || !gameStarted) return;
+            
+            // Focus the hidden input if it's not focused
+            const input = document.getElementById('wordInput');
+            if (document.activeElement !== input) {
+                input.focus();
+            }
+        });
+
+        document.getElementById('wordInput').addEventListener('input', function(e) {
+            currentTyping = this.value.trim().toLowerCase();
+            updateTypingDisplay();
+            updateTargeting();
+        });
+
+        document.getElementById('wordInput').addEventListener('keydown', function(e) {
+            if (e.key === ' ' || e.code === 'Space') {
+                e.preventDefault();
+                const input = this.value.trim().toLowerCase();
+                this.value = '';
+                currentTyping = '';
+                updateTypingDisplay();
+                
+                if (targetCloud && targetCloud.word === input && !targetCloud.fading) {
+                    // Fire bullets at the target
+                    fireBullets(targetCloud);
+                    targetCloud.fading = true;
+                    wordsTyped++;
+                    updateScore();
+                    playSuccessSound();
+                    
+                    // Clear targeting
+                    targetCloud.targeted = false;
+                    targetCloud = null;
+                    
+                    // Remove cloud after delay
+                    setTimeout(() => {
+                        clouds = clouds.filter(cloud => !cloud.fading || cloud.opacity > 0);
+                    }, 1000);
+                }
+            }
+        });
+
+        function updateTypingDisplay() {
+            const display = document.getElementById('typingDisplay');
+            display.textContent = currentTyping || '';
+            display.style.opacity = currentTyping ? '1' : '0';
+        }
+
+        function updateTargeting() {
+            // Clear previous targeting
+            clouds.forEach(cloud => cloud.targeted = false);
+            targetCloud = null;
+            
+            if (!currentTyping) return;
+            
+            // Find clouds that match the current typing
+            for (let cloud of clouds) {
+                if (!cloud.fading && cloud.word.toLowerCase().startsWith(currentTyping)) {
+                    cloud.targeted = true;
+                    targetCloud = cloud;
+                    break; // Only target the first matching cloud
+                }
+            }
+        }
+
+        function fireBullets(cloud) {
+            // Fire multiple bullets for effect
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    const bullet = new Bullet(
+                        characterX + (Math.random() - 0.5) * 10,
+                        character.y - 20,
+                        cloud.x + (Math.random() - 0.5) * 20,
+                        cloud.y
+                    );
+                    bullets.push(bullet);
+                }, i * 50);
+            }
+        }
+
+        // Settings functions
+        document.getElementById('menuButton').addEventListener('click', showSettings);
+        document.getElementById('playButton').addEventListener('click', startGame);
+        
+        document.getElementById('wordListType').addEventListener('change', function() {
+            document.getElementById('customWordsLabel').style.display = 
+                this.value === 'custom' ? 'block' : 'none';
+        });
+
+        function showSettings() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('settingsModal').style.display = 'block';
+            gameRunning = false;
+        }
+
+        function closeSettings() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('settingsModal').style.display = 'none';
+            if (gameStarted) {
+                gameRunning = true;
+            }
+        }
+
+        function saveSettings() {
+            difficulty = document.getElementById('difficulty').value;
+            soundEnabled = document.getElementById('soundToggle').checked;
+            
+            // Update spawn rate based on difficulty
+            switch(difficulty) {
+                case 'easy': cloudSpawnInterval = 180; break;
+                case 'medium': cloudSpawnInterval = 120; break;
+                case 'hard': cloudSpawnInterval = 60; break;
+            }
+            
+            // Handle word list
+            if (document.getElementById('wordListType').value === 'custom') {
+                const customText = document.getElementById('customWords').value;
+                // Split by various delimiters: comma, space, newline, period, semicolon, etc.
+                const words = customText.split(/[\s,\n.;:|]+/)
+                    .map(w => w.trim().toLowerCase())
+                    .filter(w => w.length > 0 && /^[a-zA-Z]+$/.test(w)); // Only keep alphabetic words
+                
+                if (words.length >= 10) {
+                    currentWords = words;
+                    console.log('Custom words set:', currentWords); // Debug log
+                } else {
+                    alert('Please enter at least 10 valid words (only alphabetic characters).');
+                    return;
+                }
+            } else {
+                currentWords = [...defaultWords];
+            }
+            
+            closeSettings();
+            
+            // Start game if not started yet
+            if (!gameStarted) {
+                startGame();
+            } else {
+                // Restart with new settings
+                restartGame();
+            }
+        }
+
+        function startGame() {
+            gameStarted = true;
+            gameRunning = true;
+            
+            // Hide start screen
+            document.getElementById('startScreen').style.display = 'none';
+            
+            // Show game UI
+            document.getElementById('healthBar').style.display = 'block';
+            document.getElementById('score').style.display = 'block';
+            document.getElementById('menuButton').style.display = 'block';
+            document.getElementById('inputContainer').style.display = 'block';
+            document.getElementById('typingDisplay').style.display = 'block';
+            
+            // Initialize game
+            health = 100;
+            score = 0;
+            wordsTyped = 0;
+            startTime = Date.now();
+            clouds = [];
+            bullets = [];
+            characterX = canvas.width / 2;
+            cloudSpawnTimer = 0;
+            currentTyping = '';
+            targetCloud = null;
+            
+            updateHealth(100);
+            updateScore();
+            updateTypingDisplay();
+            
+            document.getElementById('wordInput').focus();
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('cloudGameHighScore', highScore);
+            }
+            
+            document.getElementById('finalScore').textContent = `Your Score: ${score} WPM`;
+            document.getElementById('highScore').textContent = `High Score: ${highScore} WPM`;
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('gameOverModal').style.display = 'block';
+        }
+
+        function restartGame() {
+            health = 100;
+            score = 0;
+            wordsTyped = 0;
+            startTime = Date.now();
+            clouds = [];
+            bullets = [];
+            characterX = canvas.width / 2;
+            cloudSpawnTimer = 0;
+            gameRunning = true;
+            currentTyping = '';
+            targetCloud = null;
+            
+            updateHealth(100);
+            updateScore();
+            updateTypingDisplay();
+            
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('gameOverModal').style.display = 'none';
+            document.getElementById('wordInput').value = '';
+            document.getElementById('wordInput').focus();
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (!gameRunning) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Update character position
+            characterX += characterSpeed * characterDirection;
+            if (characterX <= 30 || characterX >= canvas.width - 30) {
+                characterDirection *= -1;
+            }
+            
+            // Spawn clouds
+            cloudSpawnTimer++;
+            if (cloudSpawnTimer >= cloudSpawnInterval) {
+                spawnCloud();
+                cloudSpawnTimer = 0;
+            }
+            
+            // Update and draw clouds
+            for (let i = clouds.length - 1; i >= 0; i--) {
+                const cloud = clouds[i];
+                cloud.update();
+                cloud.draw();
+                
+                // Check collision
+                if (!cloud.fading && cloud.checkCollision(characterX, character.y)) {
+                    updateHealth(health - 15);
+                    playDamageSound();
+                    clouds.splice(i, 1);
+                    
+                    // Add shake effect
+                    document.querySelector('.character')?.classList.add('hit');
+                    setTimeout(() => {
+                        document.querySelector('.character')?.classList.remove('hit');
+                    }, 500);
+                    continue;
+                }
+                
+                // Remove clouds that are off screen or fully faded
+                if (cloud.y > canvas.height + 50 || cloud.opacity <= 0) {
+                    clouds.splice(i, 1);
+                }
+            }
+            
+            // Update and draw bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.update();
+                bullet.draw();
+                
+                if (!bullet.active) {
+                    bullets.splice(i, 1);
+                }
+            }
+            
+            // Draw targeting line
+            if (targetCloud && currentTyping) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 165, 0, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(characterX, character.y - 20);
+                ctx.lineTo(targetCloud.x, targetCloud.y);
+                ctx.stroke();
+                ctx.restore();
+            }
+            
+            // Draw character
+            character.y = canvas.height - 100;
+            character.draw();
+            
+            // Update score continuously
+            updateScore();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start game loop (but game won't run until Play is clicked)
+        gameLoop();
+    </script>
+</body>
+</html>
